@@ -27,7 +27,8 @@ import sys
 from os_xenapi.client import exception
 
 
-PATTERN_XENSTORE_VIFS_IN_VM = '/xapi/%s/private/vif'
+#PATTERN_XENSTORE_VIFS_IN_VM = '/xapi/%s/private/vif'
+PATTERN_XENSTORE_VIFS_IN_VM = '/local/domain/0/backend/vif/12'
 
 
 LOG_ROOT = '/var/log/os-xenapi'
@@ -157,13 +158,16 @@ def get_vm_vifs(xenserver_client, vm_uuid):
     :returns: list --  list the VM's vif data.
     """
 
-    vm_vifs = PATTERN_XENSTORE_VIFS_IN_VM % vm_uuid
+    #vm_vifs = PATTERN_XENSTORE_VIFS_IN_VM % vm_uuid
+    vm_vifs = PATTERN_XENSTORE_VIFS_IN_VM
     _, out, _ = xenserver_client.ssh('xenstore-list %s' % vm_vifs)
     vif_ids = [x.strip() for x in out.split('\n') if x.strip()]
 
     vifs = []
     for id in vif_ids:
+        print("ID: {}".format(id))
         vif_ent = '/'.join([vm_vifs, id])
+        print("VIF_ENT: {}".format(vif_ent))
         _, out, _ = xenserver_client.ssh('xenstore-ls %s' % vif_ent)
         key_values = [x.strip().split(' = ') for x in out.split('\n')
                       if ' = ' in x]
@@ -187,18 +191,24 @@ def get_domu_vifs_by_eth(xenserver_client):
     vm_uuid = out.split('/')[-1]
 
     vifs = get_vm_vifs(xenserver_client, vm_uuid)
+    print("MYVIFS: {}".format(vifs))
+    #vifs_by_mac = {vif['bridge-MAC']: vif for vif in vifs}
     vifs_by_mac = {vif['mac']: vif for vif in vifs}
 
     # Get all ethernet interfaces and mapping them into vifs basing on
     # mac address
     vifs_by_eth = {}
+    print("netifaces.interfaces: {}".format(netifaces.interfaces))
     for eth in netifaces.interfaces():
+        print("**ETHS: {}".format(eth))
         mac_addrs = [x['addr'] for x in
                      netifaces.ifaddresses(eth)[netifaces.AF_LINK]]
         for mac in vifs_by_mac:
             if mac in mac_addrs:
                 vifs_by_eth[eth] = vifs_by_mac[mac]
+#                vifs_by_eth[eth] = vifs_by_mac[bridge-MAC]
                 break
+    print("vifs_by_eth: \t{}".format(vifs_by_eth))
     return vifs_by_eth
 
 
